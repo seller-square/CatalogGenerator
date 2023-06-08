@@ -22,10 +22,14 @@ function Form(){
     const [features, setFeatures] = useState('');
     const [loading, setLoading] = useState(false);
 
-    const [mData, setmData] = useState({});
-    const [pData, setpData] = useState({});
-    const [nData, setnData] = useState({});
+    
+
     const [keywords, setKeywords] = useState([]);
+    const [responses, setResponses] = useState([]);
+    const [currentResponseIndex, setCurrentResponseIndex] = useState(0);
+    const totalResponses = responses.length;
+    //const [isManuallyModified, setIsManuallyModified] = useState(false);
+
         // const handleAutomaticClick = (event) => {
         //   event.preventDefault();
         //   const concatenatedText = product + ' ' + features;
@@ -37,16 +41,25 @@ function Form(){
         //   });
         //   setKeywords(extractedKeywords);
         // };
-    
+        const updateResponseElement = (index, newValue) => {
+          setResponses(prevResponses => {
+            const newResponses = [...prevResponses]; // Create a copy of the original array
+            newResponses[index] = newValue; // Update the desired element
+            return newResponses; // Set the new array as the state value
+          });
+        };
+        
+        
    
   
     const handleAutomaticClick = (event) => {
         event.preventDefault(); 
-      setKeywords(test);
+        updateResponseElement(currentResponseIndex, event.target.value);
+        //setIsManuallyModified(true);
+       console.log(event.target.value)
     };
   
-    const handleManualChange = (event) => {
-        
+    const handleManualChange = (event) => {       
       setKeywords(event.target.value);
     };
     const catalog = {
@@ -95,9 +108,16 @@ function Form(){
 
   
       const formatData = (data) => {
+        if (!data) {
+          return ''; // Return an empty string if data is undefined or null
+        }
+        // if (isManuallyModified)
+        // {
+        //   return data;
+        // }
         const dataString = JSON.stringify(data); // Convert data object to string
         const formattedData = dataString.replace(
-          /(Title:)(.*?)(Product Description:)(.*?)(Bullet Points:)([\s\S]*)/s,
+          /(Title:)(.*?)(Product Description:)(.*?)(Features:)([\s\S]*)/s,
           (match, title, titleValue, desc, descValue, bullet, bulletValue) => {
             //const productDescription = addLineBreaks(descValue.trim(), 180);
             const bulletPoints = addLineBreaksBullet(bulletValue.trim());
@@ -129,7 +149,7 @@ function Form(){
       
       const addLineBreaksBullet = (text) => {
         const lines = [];
-        const bullets = text.split(/(?=\d\.)/);
+        const bullets = text.split("Bullet point:");
       
         bullets.forEach((bullet) => {
           lines.push(bullet.trim());
@@ -142,7 +162,9 @@ function Form(){
       
       
       // Usage
-      const formattedOutput = formatData(mData);
+      //const currentResponse = responses[currentResponseIndex];
+      //const formattedOutput = currentResponse ? formatData(currentResponse) : '';
+
 
     const handleSubmit = async (event) => {
         
@@ -175,9 +197,10 @@ function Form(){
             }
       
             const data = await response.json();
-            setmData(data);
-            setpData(data);
-            setnData(data);
+            
+           
+            setResponses(prevResponses => [...prevResponses, formatData(data)]);
+            setCurrentResponseIndex(totalResponses);
             setflag(false);
       console.log(data);
 
@@ -187,13 +210,22 @@ function Form(){
          setLoading(false);
         }
         const previous = () => {
-          setmData(pData);
-        }
-        const next =()=>{
-          setmData(nData);
-        }
+          if (currentResponseIndex > 0) {
+            //setIsManuallyModified(false);
+            setCurrentResponseIndex(prevIndex => prevIndex - 1);
+          }
+        };
+        
+        const next = () => {
+          if (currentResponseIndex < totalResponses - 1) {
+            //setIsManuallyModified(false);
+            setCurrentResponseIndex(prevIndex => prevIndex + 1);
+          }
+        };
+        
         const regenerate = async () => {
           setLoading(true);
+          //setIsManuallyModified(false);
             try {
               const response = await fetch(`https://cataloggeneratorv1.azurewebsites.net/api/CatalogGeneratorV1?product=${catalog.product}&brand=${catalog.brand}&marketplace=${catalog.marketplace}&gender=${catalog.gender}&age=${catalog.age}&quantity=${catalog.quantity}&tone=${catalog.tone}&features=${catalog.features}&keywords=${catalog.keywords}`, {
                 method: 'POST',
@@ -206,10 +238,12 @@ function Form(){
               if (!response.ok) {
                 throw new Error('Network response was not ok');
               }
-              setpData(mData);
+              
               const data = await response.json();
-              setmData(data);
-              setnData(data);
+              setResponses(prevResponses => [...prevResponses, formatData(data)]);
+              setCurrentResponseIndex(totalResponses);
+              
+              
               
             } catch (error) {
               console.log(error);
@@ -252,7 +286,7 @@ function Form(){
 
                             </div>
                             <div>
-                                <label className='label-1-2'>Age Group*</label>
+                                <label className='label-1-2'>Select Age Group*</label>
                                 <Select3 onChange={handleAgeChange}/>
 
                             </div>
@@ -301,17 +335,20 @@ function Form(){
             <div className="content">
                 <label className="r-title">Product Name: {catalog.product}</label><br /><br />
                 {/* <pre className='r-label'>{formattedOutput}</pre> */}
-                <textarea rows='24' value={formattedOutput} onChange={handleAutomaticClick}></textarea>
+                <label className=''>Response Number: { currentResponseIndex }</label>
+                <textarea rows='24' value={responses[currentResponseIndex]} onChange={handleAutomaticClick}></textarea>
                {/* <pre className='r-label'>{mData}</pre> */}
             <br />
                 
             </div>
             {loading && <LoadingSpinner />}
             <div className="buttons">
+              <div className="buttons">
                 <button onClick={regenerate} className="r-button">Regenerate Response</button>
-                <button onClick={previous} className="r-button">Back</button>
-                <button onClick={next} className="r-button">next</button>
-                <button onClick={() => setflag(!flag)} className="r-button"  id="back">Back to Generate Catalog</button>
+                <button onClick={previous} className="r-button" disabled={currentResponseIndex === 0}>Previous</button>
+                <button onClick={next} className="r-button" disabled={currentResponseIndex === totalResponses - 1}>Next</button>
+                <button onClick={() => setflag(!flag)} className="r-button" id="back">Back to Generate Catalog</button>
+              </div>
             </div>
              
         </div>
